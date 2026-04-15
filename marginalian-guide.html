@@ -56,6 +56,14 @@ input[type=text]{width:100%;background:var(--card);border:1px solid var(--border
 input[type=text]:focus{border-color:var(--acc)}
 select{background:var(--card);border:1px solid var(--border);color:var(--mute);padding:5px 10px;border-radius:6px;font-size:12px;font-family:var(--body)}
 .collapse-hint{font-size:11px;color:var(--dim);margin-left:6px}
+.alpha-bar{display:flex;flex-wrap:wrap;gap:2px;margin-bottom:10px}
+.alpha-bar button{background:transparent;border:1px solid var(--border);color:var(--dim);width:28px;height:28px;border-radius:6px;cursor:pointer;font-family:var(--body);font-size:12px;font-weight:500;transition:all .2s}
+.alpha-bar button:hover{background:var(--hover);color:var(--text)}
+.alpha-bar button.on{background:var(--acc);color:#FFF;border-color:var(--acc)}
+.show-more{display:block;width:100%;padding:12px;margin:16px 0;background:var(--hover);border:1px solid var(--border);border-radius:10px;cursor:pointer;font-family:var(--body);font-size:14px;color:var(--acc);font-weight:500;text-align:center;transition:all .2s}
+.show-more:hover{background:var(--acc);color:#FFF;border-color:var(--acc)}
+.back-top{position:fixed;bottom:20px;right:20px;width:40px;height:40px;border-radius:50%;background:var(--acc);color:#FFF;border:none;cursor:pointer;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,.15);opacity:0;transition:opacity .3s;z-index:99}
+.back-top.show{opacity:1}
 footer{text-align:center;padding:24px;border-top:1px solid var(--border);max-width:680px;margin:0 auto}
 footer p{font-size:13px;color:var(--mute);font-style:italic;line-height:1.7}
 </style>
@@ -76,6 +84,7 @@ footer p{font-size:13px;color:var(--mute);font-style:italic;line-height:1.7}
 </header>
 <main id="content"></main>
 <footer><p>All ideas, insights, and lessons are drawn from the writing of Maria Popova at <a href="https://www.themarginalian.org" target="_blank" style="color:var(--acc)">themarginalian.org</a><br>"Marginalia on our search for meaning" — free, ad-free, fully human since 2006.</p></footer>
+<button class="back-top" id="btt" onclick="window.scrollTo({top:0,behavior:'smooth'})">&uarr;</button>
 
 <script>
 var TH=[
@@ -291,10 +300,11 @@ var VCS=[
 
 ];
 
-var view="map",sel=null,ft="all",fTier=0,srt="tier",query="",expL=null,vft="all",vTier=0,vq="",expV=null;
+var view="map",sel=null,ft="all",fTier=0,srt="tier",query="",expL=null,vft="all",vTier=0,vq="",expV=null,vPage=25,lPage=25,vAlpha="",lAlpha="";
+window.addEventListener("scroll",function(){var b=document.getElementById("btt");if(b)b.classList.toggle("show",window.scrollY>400)});
 
 function render(){
-  document.getElementById("tabs").innerHTML=[["map","\u25c8 Constellation"],["compass","\u275b Life compass"],["voices","\u270d Voices ("+VCS.length+")"],["library","\u229f Library ("+BK.length+")"]].map(function(v){return'<button class="tab'+(view===v[0]?" on":"")+'" onclick="view=\''+v[0]+'\';sel=null;expL=null;expV=null;render()">'+v[1]+'</button>'}).join("");
+  document.getElementById("tabs").innerHTML=[["map","\u25c8 Constellation"],["compass","\u275b Life compass"],["voices","\u270d Voices ("+VCS.length+")"],["library","\u229f Library ("+BK.length+")"]].map(function(v){return'<button class="tab'+(view===v[0]?" on":"")+'" onclick="view=\''+v[0]+'\';sel=null;expL=null;expV=null;vPage=25;lPage=25;vAlpha=\'\';lAlpha=\'\';render()">'+v[1]+'</button>'}).join("");
   var c=document.getElementById("content");
   if(view==="map"&&!sel)c.innerHTML=renderMap();
   else if(view==="map"&&sel)c.innerHTML=renderTheme();
@@ -340,11 +350,20 @@ function renderVoices(){
   if(vTier>0)list=list.filter(function(v){return v[3]>=vTier});
   if(vq.trim()){var q=vq.toLowerCase();list=list.filter(function(v){return v[0].toLowerCase().indexOf(q)>=0||v[1].toLowerCase().indexOf(q)>=0})}
   list.sort(function(a,b){return b[3]-a[3]||a[0].localeCompare(b[0])});
+  if(vAlpha){list=list.filter(function(v){return v[0].charAt(0).toUpperCase()===vAlpha})}
 
-  var thPills=[{id:"all",n:"All"}].concat(TH).map(function(t){return'<span class="pill'+(vft===t.id?" on":"")+'" onclick="vft=\''+t.id+'\';render()">'+(t.i?t.i+" ":"")+t.n+'</span>'}).join("");
-  var tierPills=[{v:0,l:"All"},{v:3,l:"\u2605\u2605\u2605"},{v:2,l:"\u2605\u2605+"}].map(function(x){return'<span class="pill'+(vTier===x.v?" on":"")+'" onclick="vTier='+x.v+';render()">'+x.l+'</span>'}).join("");
+  var thPills=[{id:"all",n:"All"}].concat(TH).map(function(t){return'<span class="pill'+(vft===t.id?" on":"")+'" onclick="vft=\''+t.id+'\';vPage=25;vAlpha=\'\';render()">'+(t.i?t.i+" ":"")+t.n+'</span>'}).join("");
+  var tierPills=[{v:0,l:"All"},{v:3,l:"\u2605\u2605\u2605"},{v:2,l:"\u2605\u2605+"}].map(function(x){return'<span class="pill'+(vTier===x.v?" on":"")+'" onclick="vTier='+x.v+';vPage=25;render()">'+x.l+'</span>'}).join("");
 
-  var cards=list.map(function(v,i){
+  var letters={};VCS.forEach(function(v){var c=v[0].charAt(0).toUpperCase();letters[c]=1});
+  var alphaBar='<div class="alpha-bar"><button class="'+(vAlpha===""?"on":"")+'" onclick="vAlpha=\'\';vPage=25;render()">All</button>';
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach(function(c){if(letters[c])alphaBar+='<button class="'+(vAlpha===c?"on":"")+'" onclick="vAlpha=\''+c+'\';vPage=25;render()">'+c+'</button>'});
+  alphaBar+='</div>';
+
+  var total=list.length;
+  var visible=list.slice(0,vPage);
+
+  var cards=visible.map(function(v,i){
     var isExp=(expV===i);
     var relBooks=BK.filter(function(b){return b[1]===v[0]||b[1].indexOf(v[0].split(" ").pop())>=0}).slice(0,5);
     var themes=v[2].map(function(tid){return gn(tid)}).join(", ");
@@ -356,7 +375,9 @@ function renderVoices(){
     return h+expanded+'</div>';
   }).join("");
 
-  return'<p class="intro">The writers, philosophers, poets, and scientists Maria Popova returns to most across two decades of The Marginalian. Tap any name to explore their essays and books.</p><p style="font-size:13px;color:var(--mute);text-align:center;margin-bottom:6px">'+VCS.length+' voices \u00b7 '+VCS.filter(function(v){return v[3]===3}).length+' foundational \u00b7 '+VCS.filter(function(v){return v[3]===2}).length+' recurring \u00b7 '+VCS.filter(function(v){return v[3]===1}).length+' notable</p><p style="font-size:11.5px;color:var(--dim);text-align:center;margin-bottom:14px">\u2605\u2605\u2605 referenced across many essays & years \u00b7 \u2605\u2605 multiple dedicated essays \u00b7 \u2605 featured in a dedicated essay</p><div style="margin-bottom:10px">'+thPills+'</div><div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'+tierPills+'</div><input type="text" placeholder="Search by name or description..." value="'+vq+'" oninput="vq=this.value;render()"><p style="font-size:12px;color:var(--dim);margin-bottom:12px">Showing '+list.length+' of '+VCS.length+'</p>'+cards;
+  var showMore=vPage<total?'<button class="show-more" onclick="vPage+=25;render()">Show more \u00b7 '+Math.min(vPage,total)+' of '+total+'</button>':'';
+
+  return'<p class="intro">The writers, philosophers, poets, and scientists Maria Popova returns to most across two decades of The Marginalian. Tap any name to explore their essays and books.</p><p style="font-size:13px;color:var(--mute);text-align:center;margin-bottom:6px">'+VCS.length+' voices \u00b7 '+VCS.filter(function(v){return v[3]===3}).length+' foundational \u00b7 '+VCS.filter(function(v){return v[3]===2}).length+' recurring \u00b7 '+VCS.filter(function(v){return v[3]===1}).length+' notable</p><p style="font-size:11.5px;color:var(--dim);text-align:center;margin-bottom:14px">\u2605\u2605\u2605 referenced across many essays & years \u00b7 \u2605\u2605 multiple dedicated essays \u00b7 \u2605 featured in a dedicated essay</p><div style="margin-bottom:10px">'+thPills+'</div><div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'+tierPills+'</div><input type="text" placeholder="Search by name or description..." value="'+vq+'" oninput="vq=this.value;vPage=25;render()">'+alphaBar+'<p style="font-size:12px;color:var(--dim);margin-bottom:12px">Showing '+Math.min(vPage,total)+' of '+total+'</p>'+cards+showMore;
 }
 
 function renderLibrary(){
@@ -368,14 +389,28 @@ function renderLibrary(){
   else if(srt==="author")list.sort(function(a,b){return a.a.localeCompare(b.a)});
   else list.sort(function(a,b){return a.t.localeCompare(b.t)});
 
-  var thPills=[{id:"all",n:"All"}].concat(TH).map(function(t){return'<span class="pill'+(ft===t.id?" on":"")+'" onclick="ft=\''+t.id+'\';render()">'+(t.i?t.i+" ":"")+t.n+'</span>'}).join("");
-  var tierPills=[{v:0,l:"All tiers"},{v:3,l:"\u2605\u2605\u2605 only"},{v:2,l:"\u2605\u2605+"}].map(function(x){return'<span class="pill'+(fTier===x.v?" on":"")+'" onclick="fTier='+x.v+';render()">'+x.l+'</span>'}).join("");
-  var cards=list.map(function(b){
+  var alphaKey=srt==="author"?"a":"t";
+  if(lAlpha){list=list.filter(function(b){return b[alphaKey].charAt(0).toUpperCase()===lAlpha})}
+
+  var thPills=[{id:"all",n:"All"}].concat(TH).map(function(t){return'<span class="pill'+(ft===t.id?" on":"")+'" onclick="ft=\''+t.id+'\';lPage=25;lAlpha=\'\';render()">'+(t.i?t.i+" ":"")+t.n+'</span>'}).join("");
+  var tierPills=[{v:0,l:"All tiers"},{v:3,l:"\u2605\u2605\u2605 only"},{v:2,l:"\u2605\u2605+"}].map(function(x){return'<span class="pill'+(fTier===x.v?" on":"")+'" onclick="fTier='+x.v+';lPage=25;render()">'+x.l+'</span>'}).join("");
+
+  var letters={};BK.forEach(function(b){var c=(srt==="author"?b[1]:b[0]).charAt(0).toUpperCase();letters[c]=1});
+  var alphaBar='<div class="alpha-bar"><button class="'+(lAlpha===""?"on":"")+'" onclick="lAlpha=\'\';lPage=25;render()">All</button>';
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach(function(c){if(letters[c])alphaBar+='<button class="'+(lAlpha===c?"on":"")+'" onclick="lAlpha=\''+c+'\';lPage=25;render()">'+c+'</button>'});
+  alphaBar+='</div>';
+
+  var total=list.length;
+  var visible=list.slice(0,lPage);
+
+  var cards=visible.map(function(b){
     var themes=b.th.map(function(tid){return gn(tid)}).join(", ");
     return'<div class="card" style="padding:12px 16px"><div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap"><span style="font-size:11px;color:var(--acc);opacity:.7">'+ST[b.tier]+'</span><span class="book-title">'+b.t+'</span><span class="book-author">\u2014 '+b.a+'</span></div><p style="font-size:13px;color:var(--mute);font-style:italic;line-height:1.5;margin:4px 0 6px">'+b.note+'</p><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px"><span style="font-size:11px;color:var(--dim)">'+themes+'</span><a href="'+bookUrl(b.t)+'" target="_blank" class="book-link" style="font-size:12px">\u2192 Read on The Marginalian</a></div></div>'
   }).join("");
 
-  return'<p style="font-size:13px;color:var(--mute);text-align:center;margin-bottom:6px">'+BK.length+' books \u00b7 '+BK.filter(function(b){return b[3]===3}).length+' foundational \u00b7 '+BK.filter(function(b){return b[3]===2}).length+' recurring \u00b7 '+BK.filter(function(b){return b[3]===1}).length+' notable</p><p style="font-size:11.5px;color:var(--dim);text-align:center;margin-bottom:14px">\u2605\u2605\u2605 referenced 10+ times across years \u00b7 \u2605\u2605 featured in multiple essays \u00b7 \u2605 featured in a dedicated essay or annual list</p><div style="margin-bottom:10px">'+thPills+'</div><div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'+tierPills+'<div style="flex:1"></div><select onchange="srt=this.value;render()"><option value="tier">Sort by importance</option><option value="author">Sort by author</option><option value="title">Sort by title</option></select></div><input type="text" placeholder="Search titles, authors, topics..." value="'+query+'" oninput="query=this.value;render()"><p style="font-size:12px;color:var(--dim);margin-bottom:12px">Showing '+list.length+' of '+BK.length+'</p>'+cards;
+  var showMore=lPage<total?'<button class="show-more" onclick="lPage+=25;render()">Show more \u00b7 '+Math.min(lPage,total)+' of '+total+'</button>':'';
+
+  return'<p style="font-size:13px;color:var(--mute);text-align:center;margin-bottom:6px">'+BK.length+' books \u00b7 '+BK.filter(function(b){return b[3]===3}).length+' foundational \u00b7 '+BK.filter(function(b){return b[3]===2}).length+' recurring \u00b7 '+BK.filter(function(b){return b[3]===1}).length+' notable</p><p style="font-size:11.5px;color:var(--dim);text-align:center;margin-bottom:14px">\u2605\u2605\u2605 referenced 10+ times across years \u00b7 \u2605\u2605 featured in multiple essays \u00b7 \u2605 featured in a dedicated essay or annual list</p><div style="margin-bottom:10px">'+thPills+'</div><div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'+tierPills+'<div style="flex:1"></div><select onchange="srt=this.value;lAlpha=\'\';lPage=25;render()"><option value="tier">Sort by importance</option><option value="author">Sort by author</option><option value="title">Sort by title</option></select></div><input type="text" placeholder="Search titles, authors, topics..." value="'+query+'" oninput="query=this.value;lPage=25;lAlpha=\'\';render()">'+alphaBar+'<p style="font-size:12px;color:var(--dim);margin-bottom:12px">Showing '+Math.min(lPage,total)+' of '+total+'</p>'+cards+showMore;
 }
 
 render();
